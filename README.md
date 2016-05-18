@@ -21,6 +21,11 @@ as well.
 npm install --save redux-observable
 ```
 
+#### Complementary Packages
+
+* [react-redux-observable](https://github.com/redux-observable/react-redux-observable) -- React helpers like `@dispatchOnMount`
+
+
 ## Usage
 
 ### Basic
@@ -40,7 +45,7 @@ const store = createStore(
 ```
 
 With redux-observable, you can dispatch any function that returns an observable,
-a promise, an observable-like object or an iterable; we call this a "thunkservable".
+a promise, an observable-like object or an iterable. We call these functions a "thunkservable".
 
 Your thunkservable emits a stream of actions.
 
@@ -61,36 +66,43 @@ dispatch(() => (function* () {
 }()));
 ```
 
+You thunkservable receives two arguments, a stream of future all actions and the redux store.
+
+```ts
+function (actions?: Observable<Action>, store?: Store): Observable<Action>
+```
+
+```js
+dispatch((actions, store) =>
+  Rx.Observable.of({
+    type: 'ASYNC_ACTION_FROM_RX',
+    value: store.getState().value
+  })
+);
+
+```
+
 Of course, you'll usually create action factories instead:
 
 ```js
-const asyncAction = () => (
-  (actions, store) => Rx.Observable.of({ type: 'ASYNC_ACTION_FROM_RX' }).delay(1000)
-);
+const asyncAction = () =>
+  (actions, store) =>
+    Rx.Observable.of({ type: 'ASYNC_ACTION_FROM_RX' })
+      .delay(1000);
 
 dispatch(asyncAction());
+```
 
-const fetchUserById = (userId) => (
-  (actions) => (
-    Rx.Observable.ajax(`/api/users/${userId}`)
-      .map(
-        (payload) => ({ type: 'FETCH_USER_FULFILLED', payload })
-      )
-      .startWith({ type: 'FETCH_USER_PENDING' })
-  )
-);
+Which allows you to create thunkservables that take their own custom arguments:
 
-dispatch(fetchUserById(123));
-
-// If you find it more readable, you certainly can omit all the those
-// arrow function parenthesis (or use regular functions)
-
+```js
 const fetchUserById = userId =>
-  actions =>
+  (actions, store) =>
     Rx.Observable.ajax(`/api/users/${userId}`)
       .map(payload => ({ type: 'FETCH_USER_FULFILLED', payload }))
       .startWith({ type: 'FETCH_USER_PENDING' });
 
+dispatch(fetchUserById(123));
 ```
 
 #### Cancellation
@@ -103,18 +115,21 @@ for `filter(action.type === 'SOME_TYPE')`. You can use this stream of all action
 `takeUntil` to abort the async action cleanly and via composition.
 
 ```js
-dispatch(
-  (actions) => Observable.timer(1000)
+const startTimer = () =>
+  actions => Observable.timer(1000)
     .map(() => ({ type: 'TIMER_COMPLETE'}))
-    .takeUntil(
-      actions.ofType('ABORT_TIMER')
-    )
-    // `actions.ofType('ABORT_TIMER')` is equivalent to
-    // `actions.filter(action => action.type === 'ABORT_TIMER')`
-);
+    .takeUntil(actions.ofType('STOP_TIMER'));
+    // `actions.ofType('STOP_TIMER')` is equivalent to
+    // `actions.filter(action => action.type === 'STOP_TIMER')`
+
+const stopTimer = () => ({ type: 'STOP_TIMER' });
+
+dispatch(startTimer());
+
+// ...
 
 // elsewhere in your code you can abort with a simple dispatch
-dispatch({ type: 'ABORT_TIMER' });
+dispatch(stopTimer());
 ```
 
 You can also cancel an async dispatch by using the return value from your dispatch, which is an
@@ -130,27 +145,25 @@ subscription.unsubscribe();
 
 ### Other API Notes
 
-The second argument to your dispatched function will be the `store` instance itself. This gives you
-the ability to `getState()` on your store in case you need to assert some condition before dispatching your
-next async message. It also gives you the ability to `dispatch()` explicitly.
-
-### Basic Dispatch Type Signature
-
-If it helps to think about it this way, in a TypeScript-style type definition, the dispatch function would
-look like this when used to dispatch an action asynchronously:
-
-```TypeScript
-dispatch = ((actions?: Observable<Action>, store?: ReduxStore) => Observable<Action>) => Subscription;
-```
+Since the second argument to your dispatched function will be the `store` instance itself this gives you
+the ability to `store.getState()` on your store in case you need to assert some condition before dispatching your
+next async message or `startWith()` some value.
 
 ### Example
 
-A full example is available in [examples/basic](examples/basic)
+Examples are available in [examples](examples/)
 
 * * *
 
 ##### Incompatible w/ redux-thunk
 
 Since redux-observable uses dispached functions, this middlware is *incompatible with redux-thunk*. At this time, this is unavoidable since providing the function a stream of future actions for cancellation is imperative.
+
+####### Migration
+
+You can migrate from redux-thunk in two steps:
+
+* Replace your thunk signature `(dispatch, getState)` with `(_, { getState })`
+* Make all thunks return something compatible with Observables, like a `Promise.resolve(action)`.
 
 :shipit:

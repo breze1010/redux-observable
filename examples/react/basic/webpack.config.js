@@ -22,14 +22,14 @@ module.exports = {
       // This is done only so that you can use the redux-observable code inside
       // this this repo, so you can edit and test against it.
       // You would normally just use the `npm install redux-observable` version
-      'redux-observable': path.resolve(__dirname, '..', '..'),
+      'redux-observable': path.resolve(__dirname, '..', '..', '..'),
       'rxjs': path.resolve(__dirname, 'node_modules', 'rxjs')
     },
-    extensions: ['', '.js']
+    extensions: ['', '.js', '.jsx']
   },
   module: {
     loaders: [{
-      test: /\.js$/,
+      test: /\.jsx?$/,
       loaders: ['react-hot', 'babel'],
       exclude: /node_modules/,
       include: __dirname
